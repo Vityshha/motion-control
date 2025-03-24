@@ -68,6 +68,7 @@ class Ui_MainWindow(object):
         self.lbl_path.setObjectName("lbl_path")
         self.horizontalLayout_2.addWidget(self.lbl_path)
         self.cb_webcam = QtWidgets.QCheckBox(self.frame_3)
+        self.cb_webcam.setChecked(True)
         self.cb_webcam.setObjectName("cb_webcam")
         self.horizontalLayout_2.addWidget(self.cb_webcam)
         self.verticalLayout_2.addWidget(self.frame_3)

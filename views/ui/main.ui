@@ -137,6 +137,9 @@
             <property name="text">
              <string>Use a webcam</string>
             </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
          </layout>

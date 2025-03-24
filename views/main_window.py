@@ -28,6 +28,8 @@ class MainWindow(QMainWindow):
         self.ui.lbl_bin.setScaledContents(False)
         self.ui.lbl_bin.setAlignment(Qt.AlignCenter)
 
+        self.change_resource()
+
     def init_signals(self):
         self.ui.btn_settings.clicked.connect(lambda: self.dialog.show())
         self.ui.cb_webcam.clicked.connect(self.change_resource)
