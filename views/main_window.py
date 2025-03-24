@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QPen
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QEvent, QRect
 
@@ -41,6 +41,8 @@ class MainWindow(QMainWindow):
         self.scale_factor_x = 1.0
         self.scale_factor_y = 1.0
 
+        self.detect = False
+
     def init_signals(self):
         self.ui.btn_settings.clicked.connect(lambda: self.dialog.show())
         self.ui.cb_webcam.clicked.connect(self.change_resource)
@@ -53,13 +55,37 @@ class MainWindow(QMainWindow):
         q_img = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(q_img)
 
-        scaled_pix = pixmap.scaled(
+        # Создаем временный pixmap для добавления текста
+        temp_pixmap = pixmap.scaled(
             self.ui.lbl_frame.width(),
             self.ui.lbl_frame.height(),
             Qt.KeepAspectRatio
         )
-        self.ui.lbl_frame.setPixmap(scaled_pix)
 
+        # Создаем QPainter для рисования на pixmap
+        painter = QPainter(temp_pixmap)
+
+        # Если обнаружено движение
+        if self.detect:
+            # Настраиваем шрифт и цвет
+            font = QFont()
+            font.setPointSize(20)
+            font.setBold(True)
+            painter.setFont(font)
+
+            # Красный текст с черной обводкой
+            painter.setPen(QPen(Qt.black, 4))
+            painter.drawText(temp_pixmap.rect(), Qt.AlignCenter, "ДВИЖЕНИЕ!")
+
+            painter.setPen(QPen(Qt.red, 2))
+            painter.drawText(temp_pixmap.rect(), Qt.AlignCenter, "ДВИЖЕНИЕ!")
+
+        painter.end()
+
+        # Устанавливаем обработанное изображение
+        self.ui.lbl_frame.setPixmap(temp_pixmap)
+
+        # Остальной код масштабирования (как было)
         frame_width = self.ui.lbl_frame.width()
         frame_height = self.ui.lbl_frame.height()
         ratio = w / h
@@ -139,3 +165,8 @@ class MainWindow(QMainWindow):
             print(f"Original coordinates: X={x_int}, Y={y_int}, W={width_int}, H={height_int}")
 
             self.signal_send_rect.emit(x_int, y_int, width_int, height_int)
+
+    def put_detect_status(self, detect):
+        self.detect = detect
+        # if hasattr(self.ui.lbl_frame, 'pixmap') and self.ui.lbl_frame.pixmap():
+        #     self.put_frame(self.ui.lbl_frame.pixmap().toImage())

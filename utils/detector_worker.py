@@ -17,7 +17,7 @@ class MotionDetectorWorker(QObject):
         self.alpha = 0.95
         self.activity_alpha = 0.9
         self.activity_threshold = 0.3
-        self.detection_threshold = 0.02
+        self.detection_threshold = 0.02  # 2% порог заполнения
         self.min_object_area = 500
 
         # Состояние обработки

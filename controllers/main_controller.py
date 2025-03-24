@@ -17,6 +17,7 @@ class MainController:
         self.detector.signal_send_frame.connect(self.views.put_frame)
         self.detector.signal_send_binary_frame.connect(self.views.put_bin_frame)
         self.views.signal_send_rect.connect(self.detector.set_detection_roi)
+        self.detector.worker.detection_signal.connect(self.detect_move_in_frame)
 
     def save_settings(self):
         alpha, activity_alpha, activity_threshold, min_object_area = self.views.dialog.get_settings()
@@ -33,3 +34,6 @@ class MainController:
     def change_settings(self):
         alpha, activity_alpha, activity_threshold, min_object_area = self.model.get_model_settings()
         self.detector.update_settings(alpha, activity_alpha, activity_threshold, min_object_area)
+
+    def detect_move_in_frame(self, detect: bool):
+        self.views.put_detect_status(detect)
