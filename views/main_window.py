@@ -1,16 +1,18 @@
 import numpy as np
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QMainWindow
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QEvent, QRect
 
 from views.ui.main import Ui_MainWindow
 from views.settings_dialog import SettingsDialog
 from models.data_model import DataModel
+from views.drawing_widget import DrawingWidget
 
 
 class MainWindow(QMainWindow):
 
     signal_run = pyqtSignal(bool)
+    signal_send_rect = pyqtSignal(int, int, int, int)
 
     def __init__(self, model: DataModel):
         super(MainWindow, self).__init__()
@@ -30,6 +32,15 @@ class MainWindow(QMainWindow):
 
         self.change_resource()
 
+        self.drawing_widget = DrawingWidget(self.ui.lbl_frame)
+        self.drawing_widget.setGeometry(0, 0, self.ui.lbl_frame.width(), self.ui.lbl_frame.height())
+        self.drawing_widget.rectangle_drawn.connect(self.handle_rectangle)
+        self.drawing_widget.hide()
+        self.ui.lbl_frame.installEventFilter(self)
+        self.current_scaled_rect = None
+        self.scale_factor_x = 1.0
+        self.scale_factor_y = 1.0
+
     def init_signals(self):
         self.ui.btn_settings.clicked.connect(lambda: self.dialog.show())
         self.ui.cb_webcam.clicked.connect(self.change_resource)
@@ -41,13 +52,33 @@ class MainWindow(QMainWindow):
         bytes_per_line = ch * w
         q_img = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(q_img)
-        self.ui.lbl_frame.setPixmap(
-            pixmap.scaled(
-                self.ui.lbl_frame.width(),
-                self.ui.lbl_frame.height(),
-                Qt.KeepAspectRatio
-            )
+
+        scaled_pix = pixmap.scaled(
+            self.ui.lbl_frame.width(),
+            self.ui.lbl_frame.height(),
+            Qt.KeepAspectRatio
         )
+        self.ui.lbl_frame.setPixmap(scaled_pix)
+
+        frame_width = self.ui.lbl_frame.width()
+        frame_height = self.ui.lbl_frame.height()
+        ratio = w / h
+
+        if frame_width / frame_height > ratio:
+            scaled_w = int(frame_height * ratio)
+            scaled_h = frame_height
+        else:
+            scaled_w = frame_width
+            scaled_h = int(frame_width / ratio)
+
+        x_offset = (frame_width - scaled_w) // 2
+        y_offset = (frame_height - scaled_h) // 2
+
+        self.current_scaled_rect = QRect(x_offset, y_offset, scaled_w, scaled_h)
+        self.scale_factor_x = w / scaled_w
+        self.scale_factor_y = h / scaled_h
+
+        self.drawing_widget.show()
 
     @pyqtSlot(np.ndarray)
     def put_bin_frame(self, frame):
@@ -80,3 +111,31 @@ class MainWindow(QMainWindow):
     def clear_holst(self):
         self.ui.lbl_frame.clear()
         self.ui.lbl_bin.clear()
+
+    def eventFilter(self, source, event):
+        if source == self.ui.lbl_frame and event.type() == QEvent.Resize:
+            self.drawing_widget.setGeometry(0, 0,
+                                            source.width(),
+                                            source.height()
+                                            )
+        return super().eventFilter(source, event)
+
+    def handle_rectangle(self, rect):
+        if not self.current_scaled_rect:
+            return
+
+        intersected = rect.intersected(self.current_scaled_rect)
+        if intersected.isValid():
+            x = (intersected.x() - self.current_scaled_rect.x()) * self.scale_factor_x
+            y = (intersected.y() - self.current_scaled_rect.y()) * self.scale_factor_y
+            width = intersected.width() * self.scale_factor_x
+            height = intersected.height() * self.scale_factor_y
+
+            x_int = int(round(x))
+            y_int = int(round(y))
+            width_int = int(round(width))
+            height_int = int(round(height))
+
+            print(f"Original coordinates: X={x_int}, Y={y_int}, W={width_int}, H={height_int}")
+
+            self.signal_send_rect.emit(x_int, y_int, width_int, height_int)

@@ -16,6 +16,7 @@ class MainController:
         self.views.signal_run.connect(self.algo_run)
         self.detector.signal_send_frame.connect(self.views.put_frame)
         self.detector.signal_send_binary_frame.connect(self.views.put_bin_frame)
+        self.views.signal_send_rect.connect(self.detector.set_detection_roi)
 
     def save_settings(self):
         alpha, activity_alpha, activity_threshold, min_object_area = self.views.dialog.get_settings()
@@ -25,7 +26,6 @@ class MainController:
     def algo_run(self, launch):
         if launch:
             self.detector.start()
-            self.detector.run()
         else:
             self.detector.stop()
             self.views.clear_holst()
