@@ -17,8 +17,8 @@ class MotionDetectorWorker(QObject):
         self.alpha = 0.95
         self.activity_alpha = 0.9
         self.activity_threshold = 0.3
-        self.detection_threshold = 0.02  # 2% порог заполнения
-        self.min_object_area = 500
+        self.detection_threshold = 0.01
+        self.min_object_area = 200
 
         # Состояние обработки
         self.accumulated_diff = None
@@ -43,11 +43,12 @@ class MotionDetectorWorker(QObject):
         cv2.destroyAllWindows()
 
     @pyqtSlot(float, float, float, float)
-    def update_settings(self, alpha, activity_alpha, activity_threshold, min_object_area):
+    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area):
         """Обновление параметров детекции"""
         self.alpha = alpha
         self.activity_alpha = activity_alpha
         self.activity_threshold = activity_threshold
+        self.detection_threshold = detection_threshold
         self.min_object_area = min_object_area
 
     @pyqtSlot(int, int, int, int)

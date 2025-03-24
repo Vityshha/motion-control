@@ -55,25 +55,20 @@ class MainWindow(QMainWindow):
         q_img = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(q_img)
 
-        # Создаем временный pixmap для добавления текста
         temp_pixmap = pixmap.scaled(
             self.ui.lbl_frame.width(),
             self.ui.lbl_frame.height(),
             Qt.KeepAspectRatio
         )
 
-        # Создаем QPainter для рисования на pixmap
         painter = QPainter(temp_pixmap)
 
-        # Если обнаружено движение
         if self.detect:
-            # Настраиваем шрифт и цвет
             font = QFont()
             font.setPointSize(20)
             font.setBold(True)
             painter.setFont(font)
 
-            # Красный текст с черной обводкой
             painter.setPen(QPen(Qt.black, 4))
             painter.drawText(temp_pixmap.rect(), Qt.AlignCenter, "ДВИЖЕНИЕ!")
 
@@ -82,10 +77,8 @@ class MainWindow(QMainWindow):
 
         painter.end()
 
-        # Устанавливаем обработанное изображение
         self.ui.lbl_frame.setPixmap(temp_pixmap)
 
-        # Остальной код масштабирования (как было)
         frame_width = self.ui.lbl_frame.width()
         frame_height = self.ui.lbl_frame.height()
         ratio = w / h

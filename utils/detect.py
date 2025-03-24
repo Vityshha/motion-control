@@ -20,8 +20,6 @@ class MotionDetector(QObject):
 
         self.worker.frame_processed.connect(self.handle_frames)
 
-        # Обработка остановки
-        # self.worker.stopped.connect(self.thread.quit)
 
     def start(self):
         """Запуск потока обработки"""
@@ -45,6 +43,6 @@ class MotionDetector(QObject):
         """Установка области для постоянного мониторинга движения"""
         self.worker.set_roi(x, y, w, h)
 
-    def update_settings(self, alpha, activity_alpha, activity_threshold, min_object_area):
+    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area):
         """Обновление параметров детекции"""
-        self.worker.update_settings(alpha, activity_alpha, activity_threshold, min_object_area)
+        self.worker.update_settings(alpha, activity_alpha, activity_threshold, detection_threshold,  min_object_area)
