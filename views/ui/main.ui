@@ -133,7 +133,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QCheckBox" name="cb_webcan">
+           <widget class="QCheckBox" name="cb_webcam">
             <property name="text">
              <string>Use a webcam</string>
             </property>
@@ -173,7 +173,7 @@
              <string>Settings</string>
             </property>
             <property name="checkable">
-             <bool>true</bool>
+             <bool>false</bool>
             </property>
            </widget>
           </item>
