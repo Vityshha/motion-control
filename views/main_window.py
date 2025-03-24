@@ -76,3 +76,7 @@ class MainWindow(QMainWindow):
             self.signal_run.emit(True)
         else:
             self.signal_run.emit(False)
+
+    def clear_holst(self):
+        self.ui.lbl_frame.clear()
+        self.ui.lbl_bin.clear()
