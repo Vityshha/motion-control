@@ -55,10 +55,6 @@ class MotionDetectorWorker(QObject):
     def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter, is_webcam, rtsp_or_path):
         """Обновление параметров детекции"""
 
-        was_running = self.running
-        if was_running:
-            self.stop_detection()
-
         self.alpha = alpha
         self.activity_alpha = activity_alpha
         self.activity_threshold = activity_threshold
@@ -68,8 +64,6 @@ class MotionDetectorWorker(QObject):
         self.is_webcam = is_webcam
         self.rtsp_or_path = rtsp_or_path
 
-        if was_running:
-            self.start_detection()
 
     @pyqtSlot(int, int, int, int)
     def set_roi(self, x, y, w, h):

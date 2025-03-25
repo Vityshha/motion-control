@@ -20,7 +20,6 @@ class MotionDetector(QObject):
 
         self.worker.frame_processed.connect(self.handle_frames)
 
-
     def start(self):
         """Запуск потока обработки"""
         if not self.thread.isRunning():
