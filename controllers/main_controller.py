@@ -26,14 +26,17 @@ class MainController:
 
     def algo_run(self, launch):
         if launch:
+            self.change_settings()
             self.detector.start()
         else:
             self.detector.stop()
             self.views.clear_holst()
 
     def change_settings(self):
-        alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter = self.model.get_model_settings()
-        self.detector.update_settings(alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter)
+        (alpha, activity_alpha, activity_threshold, detection_threshold,
+         min_object_area, use_filter, is_webcam, rtsp_or_path) = self.model.get_model_settings()
+        self.detector.update_settings(alpha, activity_alpha, activity_threshold, detection_threshold,
+                                      min_object_area, use_filter, is_webcam, rtsp_or_path)
 
     def detect_move_in_frame(self, detect: bool):
         self.views.put_detect_status(detect)

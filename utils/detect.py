@@ -43,6 +43,6 @@ class MotionDetector(QObject):
         """Установка области для постоянного мониторинга движения"""
         self.worker.set_roi(x, y, w, h)
 
-    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter):
+    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter, is_webcam, rtsp_or_path):
         """Обновление параметров детекции"""
-        self.worker.update_settings(alpha, activity_alpha, activity_threshold, detection_threshold,  min_object_area, use_filter)
+        self.worker.update_settings(alpha, activity_alpha, activity_threshold, detection_threshold,  min_object_area, use_filter, is_webcam, rtsp_or_path)

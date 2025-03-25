@@ -20,6 +20,8 @@ class MotionDetectorWorker(QObject):
         self.detection_threshold = 0.01
         self.min_object_area = 200
         self.use_filter = True
+        self.is_webcam = True
+        self.rtsp_or_path = None
 
         # Состояние обработки
         self.accumulated_diff = None
@@ -30,7 +32,13 @@ class MotionDetectorWorker(QObject):
     def start_detection(self):
         """Запуск детекции в отдельном потоке"""
         self.running = True
-        self.cap = cv2.VideoCapture(0)
+        if self.is_webcam:
+            self.cap = cv2.VideoCapture(0)
+        else:
+            if self.rtsp_or_path:
+                self.cap = cv2.VideoCapture(self.rtsp_or_path)
+            else:
+                self.cap = cv2.VideoCapture(0)
         self.accumulated_diff = None
         self.activity_map = None
         self.process_frames()
@@ -43,15 +51,25 @@ class MotionDetectorWorker(QObject):
             self.cap.release()
         cv2.destroyAllWindows()
 
-    @pyqtSlot(float, float, float, float, bool)
-    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter):
+    @pyqtSlot(float, float, float, float, bool, bool, str)
+    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter, is_webcam, rtsp_or_path):
         """Обновление параметров детекции"""
+
+        was_running = self.running
+        if was_running:
+            self.stop_detection()
+
         self.alpha = alpha
         self.activity_alpha = activity_alpha
         self.activity_threshold = activity_threshold
         self.detection_threshold = detection_threshold
         self.min_object_area = min_object_area
         self.use_filter = use_filter
+        self.is_webcam = is_webcam
+        self.rtsp_or_path = rtsp_or_path
+
+        if was_running:
+            self.start_detection()
 
     @pyqtSlot(int, int, int, int)
     def set_roi(self, x, y, w, h):

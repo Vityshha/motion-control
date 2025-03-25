@@ -21,4 +21,5 @@ class DataModel(object):
         self.use_filter = use_filter
 
     def get_model_settings(self):
-        return self._alpha, self._activity_alpha, self._activity_threshold, self._detection_threshold, self._min_object_area, self.use_filter
+        return (self._alpha, self._activity_alpha, self._activity_threshold, self._detection_threshold,
+                self._min_object_area, self.use_filter, self.is_webcam, self.rtsp_or_path)
