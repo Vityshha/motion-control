@@ -47,6 +47,8 @@ class MainWindow(QMainWindow):
         self.ui.btn_settings.clicked.connect(lambda: self.dialog.show())
         self.ui.cb_webcam.clicked.connect(self.change_resource)
         self.ui.btn_start.clicked.connect(self.run)
+        self.ui.lbl_path.textChanged.connect(self.change_path)
+        self.dialog.ui.cb_filter.clicked.connect(self.change_filter_status)
 
     @pyqtSlot(np.ndarray)
     def put_frame(self, frame):
@@ -121,6 +123,13 @@ class MainWindow(QMainWindow):
             self.ui.lbl_path.setEnabled(True)
             self.model.is_webcam = False
 
+    def change_path(self):
+        self.model.rtsp_or_path = self.ui.lbl_path.text()
+
+    def change_filter_status(self):
+        self.model.use_filter = self.dialog.ui.cb_filter.isChecked()
+        print('change filter status')
+
     def run(self):
         if self.ui.btn_start.isChecked():
             self.signal_run.emit(True)
@@ -161,5 +170,3 @@ class MainWindow(QMainWindow):
 
     def put_detect_status(self, detect):
         self.detect = detect
-        # if hasattr(self.ui.lbl_frame, 'pixmap') and self.ui.lbl_frame.pixmap():
-        #     self.put_frame(self.ui.lbl_frame.pixmap().toImage())

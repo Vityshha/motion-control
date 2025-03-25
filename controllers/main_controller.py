@@ -20,8 +20,8 @@ class MainController:
         self.detector.worker.detection_signal.connect(self.detect_move_in_frame)
 
     def save_settings(self):
-        alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area = self.views.dialog.get_settings()
-        self.model.change_settings(alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area)
+        alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter  = self.views.dialog.get_settings()
+        self.model.change_settings(alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter)
         self.change_settings()
 
     def algo_run(self, launch):
@@ -32,8 +32,8 @@ class MainController:
             self.views.clear_holst()
 
     def change_settings(self):
-        alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area = self.model.get_model_settings()
-        self.detector.update_settings(alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area)
+        alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter = self.model.get_model_settings()
+        self.detector.update_settings(alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter)
 
     def detect_move_in_frame(self, detect: bool):
         self.views.put_detect_status(detect)

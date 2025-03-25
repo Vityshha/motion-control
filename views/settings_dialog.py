@@ -11,4 +11,6 @@ class SettingsDialog(QDialog):
         self.ui.btn_save.clicked.connect(lambda: self.close())
 
     def get_settings(self):
-        return self.ui.alpha.value(), self.ui.activity_alpha.value(), self.ui.activity_threshold.value(), self.ui.detection_threshold.value()/100, self.ui.min_object_area.value()
+        return (self.ui.alpha.value(), self.ui.activity_alpha.value(), self.ui.activity_threshold.value(),
+                self.ui.detection_threshold.value()/100, self.ui.min_object_area.value(),
+                self.ui.cb_filter.isChecked())

@@ -19,6 +19,7 @@ class MotionDetectorWorker(QObject):
         self.activity_threshold = 0.3
         self.detection_threshold = 0.01
         self.min_object_area = 200
+        self.use_filter = True
 
         # Состояние обработки
         self.accumulated_diff = None
@@ -42,14 +43,15 @@ class MotionDetectorWorker(QObject):
             self.cap.release()
         cv2.destroyAllWindows()
 
-    @pyqtSlot(float, float, float, float)
-    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area):
+    @pyqtSlot(float, float, float, float, bool)
+    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter):
         """Обновление параметров детекции"""
         self.alpha = alpha
         self.activity_alpha = activity_alpha
         self.activity_threshold = activity_threshold
         self.detection_threshold = detection_threshold
         self.min_object_area = min_object_area
+        self.use_filter = use_filter
 
     @pyqtSlot(int, int, int, int)
     def set_roi(self, x, y, w, h):
@@ -65,7 +67,8 @@ class MotionDetectorWorker(QObject):
 
             # Предобработка кадра
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (21, 21), 0)
+            if self.use_filter:
+                gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
             # Инициализация фоновой модели
             if self.accumulated_diff is None:
@@ -85,7 +88,8 @@ class MotionDetectorWorker(QObject):
             # Постобработка маски
             _, object_mask = cv2.threshold((self.activity_map * 255).astype("uint8"),
                                            int(self.activity_threshold * 255), 255, cv2.THRESH_BINARY)
-            object_mask = cv2.morphologyEx(object_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+            if self.use_filter:
+                object_mask = cv2.morphologyEx(object_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
 
             # Фильтрация контуров
             contours, _ = cv2.findContours(object_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
