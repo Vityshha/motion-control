@@ -1,73 +1,85 @@
 import cv2
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
+from models.settings_manager import settings_manager
 
 
 class MotionDetectorWorker(QObject):
     frame_processed = pyqtSignal(np.ndarray, np.ndarray)
     detection_signal = pyqtSignal(bool)
+    finished = pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.running = False
         self.cap = None
         self.current_roi = None
-
-        # Параметры детекции
-        self.alpha = 0.95
-        self.activity_alpha = 0.9
-        self.activity_threshold = 0.3
-        self.detection_threshold = 0.01
-        self.min_object_area = 200
-        self.use_filter = True
-        self.is_webcam = True
-        self.rtsp_or_path = None
-
-        # Состояние обработки
         self.accumulated_diff = None
         self.activity_map = None
         self.current_object_mask = None
 
+        # Инициализация параметров
+        self._connect_settings()
+        self._apply_current_settings()
+
+    def _connect_settings(self):
+        settings_manager.settings_changed.connect(self._on_settings_changed)
+
+    def _apply_current_settings(self):
+        """Обновление параметров из менеджера настроек"""
+        settings = settings_manager.settings
+        self.alpha = settings["alpha"]
+        self.activity_alpha = settings["activity_alpha"]
+        self.activity_threshold = settings["activity_threshold"]
+        self.detection_threshold = settings["detection_threshold"]
+        self.min_object_area = settings["min_object_area"]
+        self.use_filter = settings["use_filter"]
+        self.is_webcam = settings["is_webcam"]
+        self.rtsp_or_path = settings["rtsp_or_path"]
+
+    @pyqtSlot(dict)
+    def _on_settings_changed(self, new_settings):
+        """Обработка изменений настроек"""
+        self._apply_current_settings()
+        if self.running and ("is_webcam" in new_settings or "rtsp_or_path" in new_settings):
+            self.restart_detector()
+
+    def restart_detector(self):
+        """Перезапуск детектора с новыми настройками"""
+        self.stop_detection()
+        self.start_detection()
+
     @pyqtSlot()
     def start_detection(self):
-        """Запуск детекции в отдельном потоке"""
+        """Запуск процесса детекции"""
         self.running = True
-        if self.is_webcam:
-            self.cap = cv2.VideoCapture(0)
-        else:
-            if self.rtsp_or_path:
-                self.cap = cv2.VideoCapture(self.rtsp_or_path)
-            else:
-                self.cap = cv2.VideoCapture(0)
+        self._init_video_capture()
         self.accumulated_diff = None
         self.activity_map = None
         self.process_frames()
 
+    def _init_video_capture(self):
+        """Инициализация видеопотока"""
+        if self.cap and self.cap.isOpened():
+            self.cap.release()
+
+        if self.is_webcam:
+            self.cap = cv2.VideoCapture(0)
+        else:
+            self.cap = cv2.VideoCapture(self.rtsp_or_path) if self.rtsp_or_path else cv2.VideoCapture(0)
+
     @pyqtSlot()
     def stop_detection(self):
-        """Остановка детекции"""
+        """Остановка процесса детекции"""
         self.running = False
         if self.cap and self.cap.isOpened():
             self.cap.release()
         cv2.destroyAllWindows()
-
-    @pyqtSlot(float, float, float, float, bool, bool, str)
-    def update_settings(self, alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter, is_webcam, rtsp_or_path):
-        """Обновление параметров детекции"""
-
-        self.alpha = alpha
-        self.activity_alpha = activity_alpha
-        self.activity_threshold = activity_threshold
-        self.detection_threshold = detection_threshold
-        self.min_object_area = min_object_area
-        self.use_filter = use_filter
-        self.is_webcam = is_webcam
-        self.rtsp_or_path = rtsp_or_path
-
+        self.finished.emit()
 
     @pyqtSlot(int, int, int, int)
     def set_roi(self, x, y, w, h):
-        """Установка новой области интереса"""
+        """Установка области интереса"""
         self.current_roi = (x, y, w, h)
 
     def process_frames(self):
@@ -92,7 +104,7 @@ class MotionDetectorWorker(QObject):
             current_diff = cv2.absdiff(gray, cv2.convertScaleAbs(self.accumulated_diff))
             _, threshold_diff = cv2.threshold(current_diff.astype("uint8"), 25, 255, cv2.THRESH_BINARY)
 
-            # Обновление фоновой модели и карты активности
+            # Обновление моделей
             self.accumulated_diff = self.alpha * self.accumulated_diff + (1 - self.alpha) * gray.astype("float32")
             self.activity_map = self.activity_alpha * self.activity_map + (1 - self.activity_alpha) * (
                         threshold_diff / 255.0)
@@ -117,19 +129,16 @@ class MotionDetectorWorker(QObject):
             self.frame_processed.emit(rgb_frame, bin_frame)
 
             if self.current_roi:
-                x, y, w, h = self.current_roi
-                self.check_movement(x, y, w, h)
+                self.check_movement(*self.current_roi)
 
         self.stop_detection()
 
     def check_movement(self, x, y, w, h):
-        """Проверка движения в указанной области"""
+        """Проверка движения в области интереса"""
         if self.current_object_mask is None:
             return
 
         mask_height, mask_width = self.current_object_mask.shape[:2]
-
-        # Проверка валидности координат
         x1 = max(int(x), 0)
         y1 = max(int(y), 0)
         x2 = min(int(x + w), mask_width)
@@ -138,19 +147,14 @@ class MotionDetectorWorker(QObject):
         if x1 >= x2 or y1 >= y2:
             return
 
-        # Анализ области интереса
         roi = self.current_object_mask[y1:y2, x1:x2]
         if roi.size == 0:
             return
 
-        # Расчет активности
         active_pixels = cv2.countNonZero(roi)
         activity_ratio = active_pixels / roi.size
         detected = activity_ratio > self.detection_threshold
-
-        # Отправка сигнала
         self.detection_signal.emit(detected)
+
         if detected:
             print(f"Movement in ROI [{x1}:{x2}, {y1}:{y2}] - Activity: {activity_ratio:.2%}")
-        else:
-            print('')

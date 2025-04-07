@@ -5,7 +5,7 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QEvent, QRect
 
 from views.ui.main import Ui_MainWindow
 from views.settings_dialog import SettingsDialog
-from models.data_model import DataModel
+from models.settings_manager import settings_manager
 from views.drawing_widget import DrawingWidget
 
 
@@ -14,10 +14,9 @@ class MainWindow(QMainWindow):
     signal_run = pyqtSignal(bool)
     signal_send_rect = pyqtSignal(int, int, int, int)
 
-    def __init__(self, model: DataModel):
-        super(MainWindow, self).__init__()
+    def __init__(self):
+        super().__init__()
         self.ui = Ui_MainWindow()
-        self.model = model
         self.dialog = SettingsDialog(self)
         self.init_ui()
         self.init_signals()
@@ -26,11 +25,11 @@ class MainWindow(QMainWindow):
         self.ui.setupUi(self)
         self.ui.lbl_frame.setScaledContents(False)
         self.ui.lbl_frame.setAlignment(Qt.AlignCenter)
-
         self.ui.lbl_bin.setScaledContents(False)
         self.ui.lbl_bin.setAlignment(Qt.AlignCenter)
 
-        self.change_resource()
+        # Инициализация из настроек
+        self._update_ui_settings(settings_manager.settings)
 
         self.drawing_widget = DrawingWidget(self.ui.lbl_frame)
         self.drawing_widget.setGeometry(0, 0, self.ui.lbl_frame.width(), self.ui.lbl_frame.height())
@@ -40,21 +39,20 @@ class MainWindow(QMainWindow):
         self.current_scaled_rect = None
         self.scale_factor_x = 1.0
         self.scale_factor_y = 1.0
-
         self.detect = False
 
     def init_signals(self):
         self.ui.btn_settings.clicked.connect(lambda: self.dialog.show())
-        self.ui.cb_webcam.clicked.connect(self.change_resource)
+        self.ui.cb_webcam.clicked.connect(self._handle_webcam_change)
         self.ui.btn_start.clicked.connect(self.run)
-        self.ui.lbl_path.textChanged.connect(self.change_path)
-        self.dialog.ui.cb_filter.clicked.connect(self.change_filter_status)
+        self.ui.lbl_path.textChanged.connect(self._handle_path_change)
+        settings_manager.settings_changed.connect(self._update_ui_settings)
 
-    @pyqtSlot(np.ndarray)
-    def put_frame(self, frame):
-        h, w, ch = frame.shape
+    @pyqtSlot(np.ndarray, np.ndarray)
+    def put_frame(self, rgb_frame, bin_frame):
+        h, w, ch = rgb_frame.shape
         bytes_per_line = ch * w
-        q_img = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        q_img = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(q_img)
 
         temp_pixmap = pixmap.scaled(
@@ -101,11 +99,10 @@ class MainWindow(QMainWindow):
 
         self.drawing_widget.show()
 
-    @pyqtSlot(np.ndarray)
-    def put_bin_frame(self, frame):
-        h, w, ch = frame.shape
+        ########
+        h, w, ch = bin_frame.shape
         bytes_per_line = ch * w
-        q_img = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        q_img = QImage(bin_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(q_img)
         self.ui.lbl_bin.setPixmap(
             pixmap.scaled(
@@ -170,3 +167,14 @@ class MainWindow(QMainWindow):
 
     def put_detect_status(self, detect):
         self.detect = detect
+
+    def _update_ui_settings(self, settings):
+        self.ui.cb_webcam.setChecked(settings["is_webcam"])
+        self.ui.lbl_path.setText(settings["rtsp_or_path"])
+        self.ui.lbl_path.setEnabled(not settings["is_webcam"])
+
+    def _handle_webcam_change(self):
+        settings_manager.update_settings({"is_webcam": self.ui.cb_webcam.isChecked()})
+
+    def _handle_path_change(self):
+        settings_manager.update_settings({"rtsp_or_path": self.ui.lbl_path.text()})

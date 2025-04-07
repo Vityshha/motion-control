@@ -1,44 +1,32 @@
-from models.data_model import DataModel
-from models.settings_manager import SettingsManager
+from PyQt5.QtCore import pyqtSlot
+from models.settings_manager import settings_manager
 from views.main_window import MainWindow
 from utils.detect import MotionDetector
 
 
 class MainController:
-    def __init__(self, model: DataModel, views: MainWindow):
-        self.model = model
-        self.settings = SettingsManager()
-        self.views = views
+    def __init__(self, main_window):
+        self.views = main_window
         self.detector = MotionDetector()
+        self.connect_signals()
 
-        self.connect()
-
-    def connect(self):
-        self.views.dialog.ui.btn_save.clicked.connect(self.save_settings)
+    def connect_signals(self):
         self.views.signal_run.connect(self.algo_run)
-        self.detector.signal_send_frame.connect(self.views.put_frame)
-        self.detector.signal_send_binary_frame.connect(self.views.put_bin_frame)
         self.views.signal_send_rect.connect(self.detector.set_detection_roi)
-        self.detector.worker.detection_signal.connect(self.detect_move_in_frame)
+        self.detector.worker.frame_processed.connect(self.views.put_frame)
+        self.detector.worker.detection_signal.connect(self.views.put_detect_status)
+        # settings_manager.settings_changed.connect(self._handle_settings_change)
 
-    def save_settings(self):
-        alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter  = self.views.dialog.get_settings()
-        self.model.change_settings(alpha, activity_alpha, activity_threshold, detection_threshold, min_object_area, use_filter)
-        self.change_settings()
 
     def algo_run(self, launch):
         if launch:
-            self.change_settings()
             self.detector.start()
         else:
             self.detector.stop()
             self.views.clear_holst()
 
-    def change_settings(self):
-        (alpha, activity_alpha, activity_threshold, detection_threshold,
-         min_object_area, use_filter, is_webcam, rtsp_or_path) = self.model.get_model_settings()
-        self.detector.update_settings(alpha, activity_alpha, activity_threshold, detection_threshold,
-                                      min_object_area, use_filter, is_webcam, rtsp_or_path)
-
-    def detect_move_in_frame(self, detect: bool):
-        self.views.put_detect_status(detect)
+    @pyqtSlot(dict)
+    def _handle_settings_change(self, new_settings):
+        if {"is_webcam", "rtsp_or_path"} & new_settings.keys():
+            if self.detector.worker.running:
+                self.detector.restart()

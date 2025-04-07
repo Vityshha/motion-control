@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QDialog
 from views.ui.settings import Ui_Dialog
-from models.settings_manager import SettingsManager
+from models.settings_manager import settings_manager
 
 
 class SettingsDialog(QDialog):
@@ -8,12 +8,11 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
-        self.setting_manager = SettingsManager()
         self.ui.btn_save.clicked.connect(self._save_settings)
         self._load_current_settings()
 
     def _load_current_settings(self):
-        settings = self.setting_manager.settings
+        settings = settings_manager.settings
         self.ui.alpha.setValue(settings["alpha"])
         self.ui.activity_alpha.setValue(settings["activity_alpha"])
         self.ui.activity_threshold.setValue(settings["activity_threshold"])
@@ -30,5 +29,5 @@ class SettingsDialog(QDialog):
             "min_object_area": self.ui.min_object_area.value(),
             "use_filter": self.ui.cb_filter.isChecked()
         }
-        self.setting_manager.update_settings(new_settings)
+        settings_manager.update_settings(new_settings)
         self.close()
