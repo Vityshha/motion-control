@@ -1,0 +1,10 @@
+{
+    "alpha": 0.6000000000000001,
+    "activity_alpha": 0.9,
+    "activity_threshold": 0.3,
+    "detection_threshold": 0.01,
+    "min_object_area": 200,
+    "use_filter": true,
+    "is_webcam": true,
+    "rtsp_or_path": ""
+}

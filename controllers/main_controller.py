@@ -1,4 +1,5 @@
 from models.data_model import DataModel
+from models.settings_manager import SettingsManager
 from views.main_window import MainWindow
 from utils.detect import MotionDetector
 
@@ -6,6 +7,7 @@ from utils.detect import MotionDetector
 class MainController:
     def __init__(self, model: DataModel, views: MainWindow):
         self.model = model
+        self.settings = SettingsManager()
         self.views = views
         self.detector = MotionDetector()
 
