@@ -15,7 +15,7 @@ class MainController:
         self.views.signal_send_rect.connect(self.detector.set_detection_roi)
         self.detector.worker.frame_processed.connect(self.views.put_frame)
         self.detector.worker.detection_signal.connect(self.views.put_detect_status)
-        # settings_manager.settings_changed.connect(self._handle_settings_change)
+        settings_manager.settings_changed.connect(self._handle_settings_change)
 
 
     def algo_run(self, launch):
@@ -25,7 +25,6 @@ class MainController:
             self.detector.stop()
             self.views.clear_holst()
 
-    @pyqtSlot(dict)
     def _handle_settings_change(self, new_settings):
         if {"is_webcam", "rtsp_or_path"} & new_settings.keys():
             if self.detector.worker.running:
