@@ -6,14 +6,14 @@ from models.settings_manager import settings_manager
 
 class MotionDetectorWorker(QObject):
     frame_processed = pyqtSignal(np.ndarray, np.ndarray)
-    detection_signal = pyqtSignal(bool)
+    detection_signal = pyqtSignal(list)  # Изменен сигнал для передачи списка результатов
     finished = pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.running = False
         self.cap = None
-        self.current_roi = None
+        self.roi_list = []  # Список для хранения всех ROI
         self.accumulated_diff = None
         self.activity_map = None
         self.current_object_mask = None
@@ -77,10 +77,10 @@ class MotionDetectorWorker(QObject):
         cv2.destroyAllWindows()
         self.finished.emit()
 
-    @pyqtSlot(int, int, int, int)
-    def set_roi(self, x, y, w, h):
-        """Установка области интереса"""
-        self.current_roi = (x, y, w, h)
+    @pyqtSlot(list)
+    def set_roi(self, roi_list):
+        """Обновление списка областей интереса"""
+        self.roi_list = [tuple(map(int, roi)) for roi in roi_list if len(roi) == 4]
 
     def process_frames(self):
         """Основной цикл обработки кадров"""
@@ -128,15 +128,28 @@ class MotionDetectorWorker(QObject):
             bin_frame = cv2.cvtColor(object_mask_filtered, cv2.COLOR_GRAY2RGB)
             self.frame_processed.emit(rgb_frame, bin_frame)
 
-            if self.current_roi:
-                self.check_movement(*self.current_roi)
+            detections = []
+            for roi in self.roi_list:
+                if len(roi) != 4:
+                    continue
+                x, y, w, h = roi
+                detected, activity_ratio = self._check_movement(x, y, w, h)
+                detections.append({
+                    'roi': roi,
+                    'detected': detected,
+                    'activity': activity_ratio
+                })
+                if detected:
+                    print(f"Movement in ROI {roi} - Activity: {activity_ratio:.2%}")
+
+            self.detection_signal.emit(detections)
 
         self.stop_detection()
 
-    def check_movement(self, x, y, w, h):
-        """Проверка движения в области интереса"""
+    def _check_movement(self, x, y, w, h):
+        """Проверка движения в конкретной области интереса"""
         if self.current_object_mask is None:
-            return
+            return False, 0.0
 
         mask_height, mask_width = self.current_object_mask.shape[:2]
         x1 = max(int(x), 0)
@@ -145,16 +158,12 @@ class MotionDetectorWorker(QObject):
         y2 = min(int(y + h), mask_height)
 
         if x1 >= x2 or y1 >= y2:
-            return
+            return False, 0.0
 
         roi = self.current_object_mask[y1:y2, x1:x2]
         if roi.size == 0:
-            return
+            return False, 0.0
 
         active_pixels = cv2.countNonZero(roi)
         activity_ratio = active_pixels / roi.size
-        detected = activity_ratio > self.detection_threshold
-        self.detection_signal.emit(detected)
-
-        if detected:
-            print(f"Movement in ROI [{x1}:{x2}, {y1}:{y2}] - Activity: {activity_ratio:.2%}")
+        return activity_ratio > self.detection_threshold, activity_ratio

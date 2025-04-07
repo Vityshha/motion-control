@@ -12,7 +12,7 @@ from views.drawing_widget import DrawingWidget
 class MainWindow(QMainWindow):
 
     signal_run = pyqtSignal(bool)
-    signal_send_rect = pyqtSignal(int, int, int, int)
+    signal_send_rect = pyqtSignal(list)
 
     def __init__(self):
         super().__init__()
@@ -145,28 +145,34 @@ class MainWindow(QMainWindow):
                                             )
         return super().eventFilter(source, event)
 
-    def handle_rectangle(self, rect):
-        if not self.current_scaled_rect:
-            return
+    @pyqtSlot(list)
+    def handle_rectangle(self, rectangles):
 
-        intersected = rect.intersected(self.current_scaled_rect)
-        if intersected.isValid():
-            x = (intersected.x() - self.current_scaled_rect.x()) * self.scale_factor_x
-            y = (intersected.y() - self.current_scaled_rect.y()) * self.scale_factor_y
-            width = intersected.width() * self.scale_factor_x
-            height = intersected.height() * self.scale_factor_y
+        valid_rects = []
 
-            x_int = int(round(x))
-            y_int = int(round(y))
-            width_int = int(round(width))
-            height_int = int(round(height))
+        for rect in rectangles:
+            if not self.current_scaled_rect:
+                return
 
-            print(f"Original coordinates: X={x_int}, Y={y_int}, W={width_int}, H={height_int}")
+            intersected = rect.intersected(self.current_scaled_rect)
+            if intersected.isValid():
+                x = (intersected.x() - self.current_scaled_rect.x()) * self.scale_factor_x
+                y = (intersected.y() - self.current_scaled_rect.y()) * self.scale_factor_y
+                width = intersected.width() * self.scale_factor_x
+                height = intersected.height() * self.scale_factor_y
 
-            self.signal_send_rect.emit(x_int, y_int, width_int, height_int)
+                x_int = int(round(x))
+                y_int = int(round(y))
+                width_int = int(round(width))
+                height_int = int(round(height))
+
+                valid_rects.append([x_int, y_int, width_int, height_int])
+
+            self.signal_send_rect.emit(valid_rects)
 
     def put_detect_status(self, detect):
-        self.detect = detect
+        print('put detect status', detect)
+        # self.detect = detect
 
     def _update_ui_settings(self, settings):
         self.ui.cb_webcam.setChecked(settings["is_webcam"])

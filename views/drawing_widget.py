@@ -2,8 +2,9 @@ from PyQt5.QtCore import QRect, QPoint, Qt, pyqtSignal
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtGui import QPainter, QPen
 
+
 class DrawingWidget(QWidget):
-    rectangle_drawn = pyqtSignal(QRect)
+    rectangle_drawn = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -11,6 +12,7 @@ class DrawingWidget(QWidget):
         self.drawing = False
         self.start_point = QPoint()
         self.end_point = QPoint()
+        self.rectangles = []
         self.current_rect = None
 
     def mousePressEvent(self, event):
@@ -18,6 +20,9 @@ class DrawingWidget(QWidget):
             self.drawing = True
             self.start_point = event.pos()
             self.end_point = event.pos()
+            self.update()
+        elif event.button() == Qt.RightButton:
+            self.rectangles.clear()
             self.current_rect = None
             self.update()
 
@@ -29,13 +34,20 @@ class DrawingWidget(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton and self.drawing:
             self.drawing = False
-            self.current_rect = QRect(self.start_point, self.end_point).normalized()
-            self.rectangle_drawn.emit(self.current_rect)
+            rect = QRect(self.start_point, self.end_point).normalized()
+            if rect.isValid():
+                self.rectangles.append(rect)
+                self.rectangle_drawn.emit(self.rectangles)
+            self.current_rect = None
             self.update()
 
     def paintEvent(self, event):
-        if self.drawing or self.current_rect:
-            painter = QPainter(self)
-            painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
-            rect = self.current_rect if self.current_rect else QRect(self.start_point, self.end_point).normalized()
+        painter = QPainter(self)
+        painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
+
+        for rect in self.rectangles:
+            painter.drawRect(rect)
+
+        if self.drawing:
+            rect = QRect(self.start_point, self.end_point).normalized()
             painter.drawRect(rect)

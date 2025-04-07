@@ -1,7 +1,4 @@
-import cv2
-import numpy as np
-from PyQt5.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
-
+from PyQt5.QtCore import QObject, QThread
 from utils.detector_worker import MotionDetectorWorker
 
 
@@ -26,5 +23,5 @@ class MotionDetector(QObject):
         self.stop()
         self.start()
 
-    def set_detection_roi(self, x, y, w, h):
-        self.worker.set_roi(x, y, w, h)
+    def set_detection_roi(self, list_rects):
+        self.worker.set_roi(list_rects)
