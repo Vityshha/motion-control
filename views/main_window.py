@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QPen
+from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QPen, QFontMetrics
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QEvent, QRect
 
@@ -10,7 +10,6 @@ from views.drawing_widget import DrawingWidget
 
 
 class MainWindow(QMainWindow):
-
     signal_run = pyqtSignal(bool)
     signal_send_rect = pyqtSignal(list)
 
@@ -18,124 +17,165 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.ui = Ui_MainWindow()
         self.dialog = SettingsDialog(self)
+        self.drawing_widget = None
+        self.current_scaled_rect = None
+        self.scale_factors = (1.0, 1.0)
+        self.detect = []
+
         self.init_ui()
         self.init_signals()
+        self.setup_drawing_widget()
 
+    # region Initialization
     def init_ui(self):
         self.ui.setupUi(self)
-        self.ui.lbl_frame.setScaledContents(False)
-        self.ui.lbl_frame.setAlignment(Qt.AlignCenter)
-        self.ui.lbl_bin.setScaledContents(False)
-        self.ui.lbl_bin.setAlignment(Qt.AlignCenter)
-
-        # Инициализация из настроек
+        self.setup_frame_labels()
         self._update_ui_settings(settings_manager.settings)
 
+    def setup_frame_labels(self):
+        for label in [self.ui.lbl_frame, self.ui.lbl_bin]:
+            label.setScaledContents(False)
+            label.setAlignment(Qt.AlignCenter)
+
+    def setup_drawing_widget(self):
         self.drawing_widget = DrawingWidget(self.ui.lbl_frame)
-        self.drawing_widget.setGeometry(0, 0, self.ui.lbl_frame.width(), self.ui.lbl_frame.height())
+        self.drawing_widget.setGeometry(0, 0,
+                                        self.ui.lbl_frame.width(),
+                                        self.ui.lbl_frame.height()
+                                        )
         self.drawing_widget.rectangle_drawn.connect(self.handle_rectangle)
+        self.drawing_widget.clear_rectangles.connect(self.handle_rectangle)
         self.drawing_widget.hide()
         self.ui.lbl_frame.installEventFilter(self)
-        self.current_scaled_rect = None
-        self.scale_factor_x = 1.0
-        self.scale_factor_y = 1.0
-        self.detect = False
 
     def init_signals(self):
-        self.ui.btn_settings.clicked.connect(lambda: self.dialog.show())
+        self.ui.btn_settings.clicked.connect(self.dialog.show)
         self.ui.cb_webcam.clicked.connect(self._handle_webcam_change)
         self.ui.btn_start.clicked.connect(self.run)
         self.ui.lbl_path.textChanged.connect(self._handle_path_change)
         settings_manager.settings_changed.connect(self._update_ui_settings)
 
+    # endregion
+
+    # region Video Processing
     @pyqtSlot(np.ndarray, np.ndarray)
     def put_frame(self, rgb_frame, bin_frame):
-        h, w, ch = rgb_frame.shape
-        bytes_per_line = ch * w
-        q_img = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        pixmap = QPixmap.fromImage(q_img)
+        self.process_rgb_frame(rgb_frame)
+        self.process_bin_frame(bin_frame)
+        self.update_scaling_factors(rgb_frame.shape)
+        self.drawing_widget.show()
 
-        temp_pixmap = pixmap.scaled(
-            self.ui.lbl_frame.width(),
-            self.ui.lbl_frame.height(),
+    def process_rgb_frame(self, frame):
+        pixmap = self.create_pixmap(frame, self.ui.lbl_frame.size())
+        if len(self.detect) > 0:
+            self.add_detection_text(pixmap, self.detect)
+        self.ui.lbl_frame.setPixmap(pixmap)
+
+    def process_bin_frame(self, frame):
+        pixmap = self.create_pixmap(frame, self.ui.lbl_bin.size())
+        self.ui.lbl_bin.setPixmap(pixmap)
+
+    def create_pixmap(self, frame, target_size):
+        h, w, ch = frame.shape
+        bytes_per_line = ch * w
+        q_img = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        return QPixmap.fromImage(q_img).scaled(
+            target_size.width(),
+            target_size.height(),
             Qt.KeepAspectRatio
         )
 
-        painter = QPainter(temp_pixmap)
+    def add_detection_text(self, pixmap, detections):
+        painter = QPainter(pixmap)
+        try:
+            painter.setRenderHint(QPainter.Antialiasing)
 
-        if self.detect:
-            font = QFont()
-            font.setPointSize(20)
-            font.setBold(True)
-            painter.setFont(font)
+            for detection in detections:
+                if not detection['detected']:
+                    continue
 
-            painter.setPen(QPen(Qt.black, 4))
-            painter.drawText(temp_pixmap.rect(), Qt.AlignCenter, "ДВИЖЕНИЕ!")
+                x = int(detection['roi'][0] / self.scale_factors[0])
+                y = int(detection['roi'][1] / self.scale_factors[1])
+                w = int(detection['roi'][2] / self.scale_factors[0])
+                h = int(detection['roi'][3] / self.scale_factors[1])
 
-            painter.setPen(QPen(Qt.red, 2))
-            painter.drawText(temp_pixmap.rect(), Qt.AlignCenter, "ДВИЖЕНИЕ!")
+                painter.setPen(QPen(Qt.red, 2))
+                painter.drawRect(x, y, w, h)
 
-        painter.end()
+                text = f"ДВИЖЕНИЕ: {detection['activity']:.1%}"
+                padding = 4
+                margin = 2
 
-        self.ui.lbl_frame.setPixmap(temp_pixmap)
+                font = QFont()
+                font.setBold(True)
 
-        frame_width = self.ui.lbl_frame.width()
-        frame_height = self.ui.lbl_frame.height()
-        ratio = w / h
+                max_width = w - 2 * padding
+                max_height = h // 4
 
-        if frame_width / frame_height > ratio:
-            scaled_w = int(frame_height * ratio)
-            scaled_h = frame_height
-        else:
-            scaled_w = frame_width
-            scaled_h = int(frame_width / ratio)
+                for font_size in range(20, 8, -1):
+                    font.setPointSize(font_size)
+                    painter.setFont(font)
+                    metrics = QFontMetrics(font)
+                    text_width = metrics.width(text)
+                    text_height = metrics.height()
 
-        x_offset = (frame_width - scaled_w) // 2
-        y_offset = (frame_height - scaled_h) // 2
+                    if text_width < max_width and text_height < max_height:
+                        break
 
-        self.current_scaled_rect = QRect(x_offset, y_offset, scaled_w, scaled_h)
-        self.scale_factor_x = w / scaled_w
-        self.scale_factor_y = h / scaled_h
+                # Рассчитываем позицию текста
+                text_rect = metrics.boundingRect(text)
+                text_rect.moveTo(x + padding, y + padding)
+                text_rect.adjust(-padding, -padding, padding, padding)
 
-        self.drawing_widget.show()
+                # Рисуем белый фон
+                painter.setBrush(Qt.white)
+                painter.setPen(Qt.NoPen)
+                painter.drawRoundedRect(
+                    text_rect.x() - margin,
+                    text_rect.y() - margin,
+                    text_rect.width() + 2 * margin,
+                    text_rect.height() + 2 * margin,
+                    3, 3
+                )
 
-        ########
-        h, w, ch = bin_frame.shape
-        bytes_per_line = ch * w
-        q_img = QImage(bin_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        pixmap = QPixmap.fromImage(q_img)
-        self.ui.lbl_bin.setPixmap(
-            pixmap.scaled(
-                self.ui.lbl_bin.width(),
-                self.ui.lbl_bin.height(),
-                Qt.KeepAspectRatio
-            )
-        )
+                # Рисуем текст
+                painter.setPen(Qt.black)
+                painter.drawText(
+                    x + padding,
+                    y + padding + metrics.ascent(),
+                    text
+                )
 
-    def change_resource(self):
-        if self.ui.cb_webcam.isChecked():
-            self.ui.lbl_path.setEnabled(False)
-            self.model.is_webcam = True
-        else:
-            self.ui.lbl_path.setEnabled(True)
-            self.model.is_webcam = False
+        finally:
+            painter.end()
 
-    def change_path(self):
-        self.model.rtsp_or_path = self.ui.lbl_path.text()
+    # endregion
 
-    def change_filter_status(self):
-        self.model.use_filter = self.dialog.ui.cb_filter.isChecked()
-        print('change filter status')
+    # region ROI Handling
+    @pyqtSlot(list)
+    def handle_rectangle(self, rectangles):
+        valid_rects = [self.convert_rect(rect) for rect in rectangles]
+        self.signal_send_rect.emit(valid_rects)
 
-    def run(self):
-        if self.ui.btn_start.isChecked():
-            self.signal_run.emit(True)
-        else:
-            self.signal_run.emit(False)
+    def convert_rect(self, rect):
+        if not self.current_scaled_rect:
+            return None
 
-    def clear_holst(self):
-        self.ui.lbl_frame.clear()
-        self.ui.lbl_bin.clear()
+        intersected = rect.intersected(self.current_scaled_rect)
+        if not intersected.isValid():
+            return None
+
+        x = (intersected.x() - self.current_scaled_rect.x()) * self.scale_factors[0]
+        y = (intersected.y() - self.current_scaled_rect.y()) * self.scale_factors[1]
+        width = intersected.width() * self.scale_factors[0]
+        height = intersected.height() * self.scale_factors[1]
+
+        return [
+            int(round(x)),
+            int(round(y)),
+            int(round(width)),
+            int(round(height))
+        ]
 
     def eventFilter(self, source, event):
         if source == self.ui.lbl_frame and event.type() == QEvent.Resize:
@@ -145,42 +185,65 @@ class MainWindow(QMainWindow):
                                             )
         return super().eventFilter(source, event)
 
-    @pyqtSlot(list)
-    def handle_rectangle(self, rectangles):
+    # endregion
 
-        valid_rects = []
-
-        for rect in rectangles:
-            if not self.current_scaled_rect:
-                return
-
-            intersected = rect.intersected(self.current_scaled_rect)
-            if intersected.isValid():
-                x = (intersected.x() - self.current_scaled_rect.x()) * self.scale_factor_x
-                y = (intersected.y() - self.current_scaled_rect.y()) * self.scale_factor_y
-                width = intersected.width() * self.scale_factor_x
-                height = intersected.height() * self.scale_factor_y
-
-                x_int = int(round(x))
-                y_int = int(round(y))
-                width_int = int(round(width))
-                height_int = int(round(height))
-
-                valid_rects.append([x_int, y_int, width_int, height_int])
-
-            self.signal_send_rect.emit(valid_rects)
-
-    def put_detect_status(self, detect):
-        print('put detect status', detect)
-        # self.detect = detect
-
+    # region Settings and Resources
     def _update_ui_settings(self, settings):
         self.ui.cb_webcam.setChecked(settings["is_webcam"])
         self.ui.lbl_path.setText(settings["rtsp_or_path"])
         self.ui.lbl_path.setEnabled(not settings["is_webcam"])
 
     def _handle_webcam_change(self):
-        settings_manager.update_settings({"is_webcam": self.ui.cb_webcam.isChecked()})
+        settings_manager.update_settings({
+            "is_webcam": self.ui.cb_webcam.isChecked()
+        })
 
     def _handle_path_change(self):
-        settings_manager.update_settings({"rtsp_or_path": self.ui.lbl_path.text()})
+        settings_manager.update_settings({
+            "rtsp_or_path": self.ui.lbl_path.text()
+        })
+
+    # endregion
+
+    # region Detection Control
+    @pyqtSlot()
+    def run(self):
+        self.signal_run.emit(self.ui.btn_start.isChecked())
+
+    @pyqtSlot(list)
+    def put_detect_status(self, detect):
+        self.detect = detect
+        print(f'Detection status: {detect}')
+
+    # endregion
+
+    # region Utility Methods
+    def update_scaling_factors(self, frame_shape):
+        frame_w, frame_h = frame_shape[1], frame_shape[0]
+        label_w = self.ui.lbl_frame.width()
+        label_h = self.ui.lbl_frame.height()
+
+        ratio = frame_w / frame_h
+        if label_w / label_h > ratio:
+            scaled_w = int(label_h * ratio)
+            scaled_h = label_h
+        else:
+            scaled_w = label_w
+            scaled_h = int(label_w / ratio)
+
+        self.current_scaled_rect = QRect(
+            (label_w - scaled_w) // 2,
+            (label_h - scaled_h) // 2,
+            scaled_w,
+            scaled_h
+        )
+
+        self.scale_factors = (
+            frame_w / scaled_w,
+            frame_h / scaled_h
+        )
+
+    def clear_holst(self):
+        self.ui.lbl_frame.clear()
+        self.ui.lbl_bin.clear()
+    # endregion

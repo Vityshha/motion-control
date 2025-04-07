@@ -5,6 +5,7 @@ from PyQt5.QtGui import QPainter, QPen
 
 class DrawingWidget(QWidget):
     rectangle_drawn = pyqtSignal(list)
+    clear_rectangles = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -24,6 +25,7 @@ class DrawingWidget(QWidget):
         elif event.button() == Qt.RightButton:
             self.rectangles.clear()
             self.current_rect = None
+            self.clear_rectangles.emit([])
             self.update()
 
     def mouseMoveEvent(self, event):
