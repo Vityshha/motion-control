@@ -1,5 +1,4 @@
 import time
-
 import cv2
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
@@ -123,26 +122,22 @@ class MotionDetectorWorker(QObject):
                     detections.append({'roi': roi, 'detected': False, 'activity': 0.0})
                     continue
 
-                # 1: Бинаризация
+                # 2: Бинаризация
                 img_anobl = (roi_mask // 255).astype(np.uint8)
-                # 2: Кол-во единиц
+                # 3: Кол-во единиц
                 b = np.sum(img_anobl)
-                # 3: Относительная плотность
+                # 4: Относительная плотность
                 p = b / img_anobl.size
 
                 if p < self.p_dop:
-                    # print(f"ROI {roi}: p={p:.3f} < p_dop={self.p_dop:.3f} — нет недопустимых движений")
-                    print('')
+                    # Если уровень активности меньше порога, то допустимое движение
                     detections.append({'roi': roi, 'detected': False, 'activity': p})
                     continue
 
                 # 5: Поиск остова
                 found = self._scan_for_template(img_anobl, self.ostov_template)
-                if found:
-                    print(f"ROI {roi}: движение недопустимо (p={p:.3f} > p_dop={self.p_dop:.3f}) — найден остов")
-                else:
-                    print(f"ROI {roi}: p={p:.3f} > p_dop={self.p_dop:.3f}, но остов не найден")
-
+                # if found: движение недопустимо
+                # else: движение допустимо
                 detections.append({'roi': roi, 'detected': found, 'activity': p})
 
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

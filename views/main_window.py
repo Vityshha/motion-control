@@ -91,60 +91,65 @@ class MainWindow(QMainWindow):
             painter.setRenderHint(QPainter.Antialiasing)
 
             for detection in detections:
-                if not detection['detected']:
-                    continue
 
-                x = int(detection['roi'][0] / self.scale_factors[0])
-                y = int(detection['roi'][1] / self.scale_factors[1])
-                w = int(detection['roi'][2] / self.scale_factors[0])
-                h = int(detection['roi'][3] / self.scale_factors[1])
+                if detection['activity'] > 0:
 
-                painter.setPen(QPen(Qt.red, 2))
-                painter.drawRect(x, y, w, h)
+                    if detection['detected']:
+                        status_move = 'Не допустимое'
+                    else:
+                        status_move = 'Допустимое'
 
-                text = f"ДВИЖЕНИЕ: {detection['activity']:.1%}"
-                padding = 4
-                margin = 2
+                    x = int(detection['roi'][0] / self.scale_factors[0])
+                    y = int(detection['roi'][1] / self.scale_factors[1])
+                    w = int(detection['roi'][2] / self.scale_factors[0])
+                    h = int(detection['roi'][3] / self.scale_factors[1])
 
-                font = QFont()
-                font.setBold(True)
+                    painter.setPen(QPen(Qt.red, 2))
+                    painter.drawRect(x, y, w, h)
 
-                max_width = w - 2 * padding
-                max_height = h // 4
+                    text = f"{status_move}: {detection['activity']:.1%}"
+                    padding = 4
+                    margin = 2
 
-                for font_size in range(20, 8, -1):
-                    font.setPointSize(font_size)
-                    painter.setFont(font)
-                    metrics = QFontMetrics(font)
-                    text_width = metrics.width(text)
-                    text_height = metrics.height()
+                    font = QFont()
+                    font.setBold(True)
 
-                    if text_width < max_width and text_height < max_height:
-                        break
+                    max_width = w - 2 * padding
+                    max_height = h // 4
 
-                # Рассчитываем позицию текста
-                text_rect = metrics.boundingRect(text)
-                text_rect.moveTo(x + padding, y + padding)
-                text_rect.adjust(-padding, -padding, padding, padding)
+                    for font_size in range(20, 8, -1):
+                        font.setPointSize(font_size)
+                        painter.setFont(font)
+                        metrics = QFontMetrics(font)
+                        text_width = metrics.width(text)
+                        text_height = metrics.height()
 
-                # Рисуем белый фон
-                painter.setBrush(Qt.white)
-                painter.setPen(Qt.NoPen)
-                painter.drawRoundedRect(
-                    text_rect.x() - margin,
-                    text_rect.y() - margin,
-                    text_rect.width() + 2 * margin,
-                    text_rect.height() + 2 * margin,
-                    3, 3
-                )
+                        if text_width < max_width and text_height < max_height:
+                            break
 
-                # Рисуем текст
-                painter.setPen(Qt.black)
-                painter.drawText(
-                    x + padding,
-                    y + padding + metrics.ascent(),
-                    text
-                )
+                    # Рассчитываем позицию текста
+                    text_rect = metrics.boundingRect(text)
+                    text_rect.moveTo(x + padding, y + padding)
+                    text_rect.adjust(-padding, -padding, padding, padding)
+
+                    # Рисуем белый фон
+                    painter.setBrush(Qt.white)
+                    painter.setPen(Qt.NoPen)
+                    painter.drawRoundedRect(
+                        text_rect.x() - margin,
+                        text_rect.y() - margin,
+                        text_rect.width() + 2 * margin,
+                        text_rect.height() + 2 * margin,
+                        3, 3
+                    )
+
+                    # Рисуем текст
+                    painter.setPen(Qt.black)
+                    painter.drawText(
+                        x + padding,
+                        y + padding + metrics.ascent(),
+                        text
+                    )
 
         finally:
             painter.end()
