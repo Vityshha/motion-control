@@ -91,65 +91,67 @@ class MainWindow(QMainWindow):
             painter.setRenderHint(QPainter.Antialiasing)
 
             for detection in detections:
+                if detection['activity'] <= 0:
+                    continue
 
-                if detection['activity'] > 0:
+                status_move = 'Не допустимое' if detection['detected'] else 'Допустимое'
+                text = f"{status_move}: p={detection['activity']:.1%}"
 
-                    if detection['detected']:
-                        status_move = 'Не допустимое'
-                    else:
-                        status_move = 'Допустимое'
+                x = int(detection['roi'][0] / self.scale_factors[0])
+                y = int(detection['roi'][1] / self.scale_factors[1])
+                w = int(detection['roi'][2] / self.scale_factors[0])
+                h = int(detection['roi'][3] / self.scale_factors[1])
 
-                    x = int(detection['roi'][0] / self.scale_factors[0])
-                    y = int(detection['roi'][1] / self.scale_factors[1])
-                    w = int(detection['roi'][2] / self.scale_factors[0])
-                    h = int(detection['roi'][3] / self.scale_factors[1])
+                # Рисуем красную рамку (сначала, чтобы фон текста её не перекрывал)
+                painter.setPen(QPen(Qt.red, 2))
+                painter.setBrush(Qt.NoBrush)  # Убедимся, что заливка отключена
+                painter.drawRect(x, y, w, h)
 
-                    painter.setPen(QPen(Qt.red, 2))
-                    painter.drawRect(x, y, w, h)
+                # Настройки шрифта
+                font = QFont()
+                font.setBold(True)
+                painter.setFont(font)
 
-                    text = f"{status_move}: {detection['activity']:.1%}"
-                    padding = 4
-                    margin = 2
+                # Параметры отступов
+                padding = 5
+                margin = 2
+                max_text_width = w - 2 * padding
+                max_text_height = h // 3  # Увеличим допустимую высоту
 
-                    font = QFont()
-                    font.setBold(True)
+                # Подбираем размер шрифта
+                font_size = 12
+                while font_size >= 8:
+                    font.setPointSize(font_size)
+                    metrics = QFontMetrics(font)
+                    text_width = metrics.horizontalAdvance(text)
+                    text_height = metrics.height()
 
-                    max_width = w - 2 * padding
-                    max_height = h // 4
+                    if text_width <= max_text_width and text_height <= max_text_height:
+                        break
+                    font_size -= 1
 
-                    for font_size in range(20, 8, -1):
-                        font.setPointSize(font_size)
-                        painter.setFont(font)
-                        metrics = QFontMetrics(font)
-                        text_width = metrics.width(text)
-                        text_height = metrics.height()
+                # Вычисляем позицию текста и фона
+                text_x = x + padding
+                text_y = y + padding + metrics.ascent()
 
-                        if text_width < max_width and text_height < max_height:
-                            break
+                # Размеры фона (с учётом margin)
+                bg_width = metrics.horizontalAdvance(text) + 2 * margin
+                bg_height = metrics.height() + 2 * margin
+                bg_x = text_x - margin
+                bg_y = text_y - metrics.ascent() - margin
 
-                    # Рассчитываем позицию текста
-                    text_rect = metrics.boundingRect(text)
-                    text_rect.moveTo(x + padding, y + padding)
-                    text_rect.adjust(-padding, -padding, padding, padding)
+                # Рисуем фон (только вокруг текста!)
+                painter.setBrush(Qt.white)
+                painter.setPen(Qt.NoPen)
+                painter.drawRoundedRect(bg_x, bg_y, bg_width, bg_height, 3, 3)
 
-                    # Рисуем белый фон
-                    painter.setBrush(Qt.white)
-                    painter.setPen(Qt.NoPen)
-                    painter.drawRoundedRect(
-                        text_rect.x() - margin,
-                        text_rect.y() - margin,
-                        text_rect.width() + 2 * margin,
-                        text_rect.height() + 2 * margin,
-                        3, 3
-                    )
+                # Рисуем текст
+                painter.setPen(Qt.black)
+                painter.drawText(text_x, text_y, text)
 
-                    # Рисуем текст
-                    painter.setPen(Qt.black)
-                    painter.drawText(
-                        x + padding,
-                        y + padding + metrics.ascent(),
-                        text
-                    )
+                # Сбрасываем кисть и перо для следующей итерации
+                painter.setBrush(Qt.NoBrush)
+                painter.setPen(QPen(Qt.red, 2))
 
         finally:
             painter.end()

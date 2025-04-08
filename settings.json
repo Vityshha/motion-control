@@ -1,5 +1,5 @@
 {
-    "ostov_size": 1,
+    "ostov_size": 10,
     "p_dop": 0.1,
     "time_sleep": 0.2,
     "use_filter": false,
