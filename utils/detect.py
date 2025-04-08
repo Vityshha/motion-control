@@ -18,6 +18,8 @@ class MotionDetector(QObject):
 
     def stop(self):
         self.worker.stop_detection()
+        self.thread.quit()
+        self.thread.wait()
 
     def restart(self):
         self.stop()

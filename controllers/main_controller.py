@@ -26,6 +26,8 @@ class MainController:
             self.views.clear_holst()
 
     def _handle_settings_change(self, new_settings):
-        if {"is_webcam", "rtsp_or_path"} & new_settings.keys():
-            if self.detector.worker.running:
-                self.detector.restart()
+        # if {"is_webcam", "rtsp_or_path"} & new_settings.keys():
+        #     # if self.detector.worker.running:
+        #     #     self.detector.restart()
+        #     pass
+        self.detector.worker._apply_current_settings()
