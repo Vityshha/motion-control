@@ -6,26 +6,26 @@ from models.settings_manager import settings_manager
 
 class MotionDetectorWorker(QObject):
     frame_processed = pyqtSignal(np.ndarray, np.ndarray)
-    detection_signal = pyqtSignal(list)  # Изменен сигнал для передачи списка результатов
+    detection_signal = pyqtSignal(list)
     finished = pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.running = False
         self.cap = None
-        self.roi_list = []  # Список для хранения всех ROI
+        self.roi_list = []
         self.accumulated_diff = None
         self.activity_map = None
         self.current_object_mask = None
 
         # Инициализация параметров
         self._connect_settings()
-        self._apply_current_settings()
+        self.apply_current_settings()
 
     def _connect_settings(self):
         settings_manager.settings_changed.connect(self._on_settings_changed)
 
-    def _apply_current_settings(self):
+    def apply_current_settings(self):
         """Обновление параметров из менеджера настроек"""
         settings = settings_manager.settings
         self.alpha = settings["alpha"]
@@ -40,7 +40,7 @@ class MotionDetectorWorker(QObject):
     @pyqtSlot(dict)
     def _on_settings_changed(self, new_settings):
         """Обработка изменений настроек"""
-        self._apply_current_settings()
+        self.apply_current_settings()
         if self.running and ("is_webcam" in new_settings or "rtsp_or_path" in new_settings):
             self.restart_detector()
 

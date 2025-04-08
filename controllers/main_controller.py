@@ -30,4 +30,4 @@ class MainController:
         #     # if self.detector.worker.running:
         #     #     self.detector.restart()
         #     pass
-        self.detector.worker._apply_current_settings()
+        self.detector.worker.apply_current_settings()
