@@ -1,7 +1,7 @@
 import numpy as np
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QPen, QFontMetrics
 from PyQt5.QtWidgets import QMainWindow
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QEvent, QRect
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QEvent, QRect, QPoint
 
 from views.ui.main import Ui_MainWindow
 from views.settings_dialog import SettingsDialog
@@ -90,71 +90,114 @@ class MainWindow(QMainWindow):
         try:
             painter.setRenderHint(QPainter.Antialiasing)
 
-            for detection in detections:
-                if detection['activity'] <= 0:
-                    continue
-
-                status_move = 'Не допустимое' if detection['detected'] else 'Допустимое'
-                text = f"{status_move}: p={detection['activity']:.1%}"
-
-                x = int(detection['roi'][0] / self.scale_factors[0])
-                y = int(detection['roi'][1] / self.scale_factors[1])
-                w = int(detection['roi'][2] / self.scale_factors[0])
-                h = int(detection['roi'][3] / self.scale_factors[1])
-
-                # Рисуем красную рамку (сначала, чтобы фон текста её не перекрывал)
-                painter.setPen(QPen(Qt.red, 2))
-                painter.setBrush(Qt.NoBrush)  # Убедимся, что заливка отключена
-                painter.drawRect(x, y, w, h)
-
-                # Настройки шрифта
-                font = QFont()
-                font.setBold(True)
-                painter.setFont(font)
-
-                # Параметры отступов
-                padding = 5
-                margin = 2
-                max_text_width = w - 2 * padding
-                max_text_height = h // 3  # Увеличим допустимую высоту
-
-                # Подбираем размер шрифта
-                font_size = 12
-                while font_size >= 8:
-                    font.setPointSize(font_size)
-                    metrics = QFontMetrics(font)
-                    text_width = metrics.horizontalAdvance(text)
-                    text_height = metrics.height()
-
-                    if text_width <= max_text_width and text_height <= max_text_height:
-                        break
-                    font_size -= 1
-
-                # Вычисляем позицию текста и фона
-                text_x = x + padding
-                text_y = y + padding + metrics.ascent()
-
-                # Размеры фона (с учётом margin)
-                bg_width = metrics.horizontalAdvance(text) + 2 * margin
-                bg_height = metrics.height() + 2 * margin
-                bg_x = text_x - margin
-                bg_y = text_y - metrics.ascent() - margin
-
-                # Рисуем фон (только вокруг текста!)
-                painter.setBrush(Qt.white)
-                painter.setPen(Qt.NoPen)
-                painter.drawRoundedRect(bg_x, bg_y, bg_width, bg_height, 3, 3)
-
-                # Рисуем текст
-                painter.setPen(Qt.black)
-                painter.drawText(text_x, text_y, text)
-
-                # Сбрасываем кисть и перо для следующей итерации
-                painter.setBrush(Qt.NoBrush)
-                painter.setPen(QPen(Qt.red, 2))
+            for detection in filter(lambda d: d['activity'] > 0, detections):
+                self._draw_single_detection(painter, detection)
 
         finally:
             painter.end()
+
+    def _draw_single_detection(self, painter, detection):
+        """Отрисовка одного обнаружения с текстом и рамкой"""
+        # Подготовка данных
+        status_text = self._generate_status_text(detection)
+        roi_rect = self._get_scaled_roi_rect(detection)
+
+        # Отрисовка элементов
+        self._draw_bounding_box(painter, roi_rect)
+        self._draw_status_text(painter, status_text, roi_rect)
+
+    def _generate_status_text(self, detection):
+        """Генерация текста статуса"""
+        status = 'Не допустимое' if detection['detected'] else 'Допустимое'
+        return f"{status}: p={detection['activity']:.1%}"
+
+    def _get_scaled_roi_rect(self, detection):
+        """Получение координат ROI с учетом масштабирования"""
+        x = int(detection['roi'][0] / self.scale_factors[0])
+        y = int(detection['roi'][1] / self.scale_factors[1])
+        w = int(detection['roi'][2] / self.scale_factors[0])
+        h = int(detection['roi'][3] / self.scale_factors[1])
+        return QRect(x, y, w, h)
+
+    def _draw_bounding_box(self, painter, rect):
+        """Отрисовка красной рамки обнаружения"""
+        painter.save()
+        try:
+            painter.setPen(QPen(Qt.red, 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(rect)
+        finally:
+            painter.restore()
+
+    def _draw_status_text(self, painter, text, roi_rect):
+        """Отрисовка текста статуса с фоном"""
+        painter.save()
+        try:
+            # Настройка шрифта
+            font = self._configure_font(painter, text, roi_rect)
+            metrics = QFontMetrics(font)
+
+            # Расчет позиций и размеров
+            text_pos, bg_rect = self._calculate_text_position(
+                metrics, text, roi_rect)
+
+            # Отрисовка фона и текста
+            self._draw_text_background(painter, bg_rect)
+            self._draw_text(painter, text, text_pos)
+
+        finally:
+            painter.restore()
+
+    def _configure_font(self, painter, text, roi_rect):
+        """Настройка оптимального размера шрифта"""
+        font = QFont()
+        font.setBold(True)
+
+        padding = 5
+        margin = 2
+        max_width = roi_rect.width() - 2 * padding
+        max_height = roi_rect.height() // 3
+
+        for font_size in range(12, 7, -1):  # От 12 до 8
+            font.setPointSize(font_size)
+            metrics = QFontMetrics(font)
+            if (metrics.horizontalAdvance(text) <= max_width and
+                    metrics.height() <= max_height):
+                painter.setFont(font)
+                return font
+
+        font.setPointSize(8)
+        painter.setFont(font)
+        return font
+
+    def _calculate_text_position(self, metrics, text, roi_rect):
+        """Вычисление позиции текста и фона"""
+        padding = 5
+        margin = 2
+
+        # Позиция текста
+        text_x = roi_rect.x() + padding
+        text_y = roi_rect.y() + padding + metrics.ascent()
+
+        # Прямоугольник фона
+        bg_width = metrics.horizontalAdvance(text) + 2 * margin
+        bg_height = metrics.height() + 2 * margin
+        bg_x = text_x - margin
+        bg_y = text_y - metrics.ascent() - margin
+
+        return (QPoint(text_x, text_y),
+                QRect(bg_x, bg_y, bg_width, bg_height))
+
+    def _draw_text_background(self, painter, rect):
+        """Отрисовка фона для текста"""
+        painter.setBrush(Qt.white)
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(rect, 3, 3)
+
+    def _draw_text(self, painter, text, position):
+        """Отрисовка текста"""
+        painter.setPen(Qt.black)
+        painter.drawText(position, text)
 
     # endregion
 

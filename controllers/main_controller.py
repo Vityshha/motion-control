@@ -1,6 +1,4 @@
-from PyQt5.QtCore import pyqtSlot
 from models.settings_manager import settings_manager
-from views.main_window import MainWindow
 from utils.detect import MotionDetector
 
 
