@@ -1,13 +1,8 @@
 {
     "ostov_size": 10,
-    "p_dop": 0.1,
+    "p_dop": 0.10000000000000003,
     "time_sleep": 0.2,
     "use_filter": false,
     "is_webcam": true,
-    "rtsp_or_path": "",
-    "alpha": 0.9,
-    "activity_alpha": 0.9,
-    "activity_threshold": 0.6,
-    "detection_threshold": 0.04,
-    "min_object_area": 200
+    "rtsp_or_path": ""
 }
