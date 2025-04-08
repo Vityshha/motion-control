@@ -26,11 +26,9 @@ class SettingsManager(QObject):
 
     def load_defaults(self):
         self._settings = {
-            "alpha": 0.95,
-            "activity_alpha": 0.9,
-            "activity_threshold": 0.3,
-            "detection_threshold": 0.01,
-            "min_object_area": 200,
+            "ostov_size": 3,
+            "p_dop": 0.1,
+            "time_sleep": 0.2,
             "use_filter": True,
             "is_webcam": True,
             "rtsp_or_path": ""

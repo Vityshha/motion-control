@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
@@ -28,14 +30,16 @@ class MotionDetectorWorker(QObject):
     def apply_current_settings(self):
         """Обновление параметров из менеджера настроек"""
         settings = settings_manager.settings
-        self.alpha = settings["alpha"]
-        self.activity_alpha = settings["activity_alpha"]
-        self.activity_threshold = settings["activity_threshold"]
-        self.detection_threshold = settings["detection_threshold"]
-        self.min_object_area = settings["min_object_area"]
+        self.ostov_size = settings["ostov_size"]        # Размер остова, задает форму активности (паттерн)
+        self.p_dop = settings['p_dop']                  # Порог чувствительности
+
+        self.time_sleep = settings['time_sleep']
         self.use_filter = settings["use_filter"]
         self.is_webcam = settings["is_webcam"]
         self.rtsp_or_path = settings["rtsp_or_path"]
+
+        self.ostov_template = np.ones((self.ostov_size, self.ostov_size), dtype=np.uint8)  # Остов из единиц
+
 
     @pyqtSlot(dict)
     def _on_settings_changed(self, new_settings):
@@ -62,7 +66,6 @@ class MotionDetectorWorker(QObject):
         """Инициализация видеопотока"""
         if self.cap and self.cap.isOpened():
             self.cap.release()
-
         if self.is_webcam:
             self.cap = cv2.VideoCapture(0)
         else:
@@ -83,87 +86,82 @@ class MotionDetectorWorker(QObject):
         self.roi_list = [tuple(map(int, roi)) for roi in roi_list if len(roi) == 4]
 
     def process_frames(self):
-        """Основной цикл обработки кадров"""
+        """Обработка кадров с анализом изменений на основе p_dop и ostov"""
+
+        prev_gray = None
+
         while self.running:
             ret, frame = self.cap.read()
             if not ret:
                 break
 
-            # Предобработка кадра
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if self.use_filter:
                 gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
-            # Инициализация фоновой модели
-            if self.accumulated_diff is None:
-                self.accumulated_diff = gray.astype("float32")
-                self.activity_map = np.zeros_like(gray, dtype="float32")
+            if prev_gray is None:
+                prev_gray = gray
                 continue
 
-            # Вычисление разницы с фоном
-            current_diff = cv2.absdiff(gray, cv2.convertScaleAbs(self.accumulated_diff))
-            _, threshold_diff = cv2.threshold(current_diff.astype("uint8"), 25, 255, cv2.THRESH_BINARY)
+            # 1. Вычисляем разницу между текущим и предыдущим кадром
+            diff = cv2.absdiff(gray, prev_gray)
+            _, diff_thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
 
-            # Обновление моделей
-            self.accumulated_diff = self.alpha * self.accumulated_diff + (1 - self.alpha) * gray.astype("float32")
-            self.activity_map = self.activity_alpha * self.activity_map + (1 - self.activity_alpha) * (
-                        threshold_diff / 255.0)
-
-            # Постобработка маски
-            _, object_mask = cv2.threshold((self.activity_map * 255).astype("uint8"),
-                                           int(self.activity_threshold * 255), 255, cv2.THRESH_BINARY)
             if self.use_filter:
-                object_mask = cv2.morphologyEx(object_mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+                diff_thresh = cv2.morphologyEx(diff_thresh, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
 
-            # Фильтрация контуров
-            contours, _ = cv2.findContours(object_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            object_mask_filtered = np.zeros_like(object_mask)
-            for cnt in contours:
-                if cv2.contourArea(cnt) > self.min_object_area:
-                    cv2.drawContours(object_mask_filtered, [cnt], -1, 255, -1)
-
-            # Сохранение и передача результатов
-            self.current_object_mask = object_mask_filtered
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            bin_frame = cv2.cvtColor(object_mask_filtered, cv2.COLOR_GRAY2RGB)
-            self.frame_processed.emit(rgb_frame, bin_frame)
+            prev_gray = gray.copy()  # Обновляем предыдущий кадр
 
             detections = []
-            for roi in self.roi_list:
+            for idx, roi in enumerate(self.roi_list):
                 if len(roi) != 4:
                     continue
-                x, y, w, h = roi
-                detected, activity_ratio = self._check_movement(x, y, w, h)
-                detections.append({
-                    'roi': roi,
-                    'detected': detected,
-                    'activity': activity_ratio
-                })
-                if detected:
-                    print(f"Movement in ROI {roi} - Activity: {activity_ratio:.2%}")
 
+                x, y, w, h = map(int, roi)
+                roi_mask = diff_thresh[y:y + h, x:x + w]
+                if roi_mask.size == 0:
+                    detections.append({'roi': roi, 'detected': False, 'activity': 0.0})
+                    continue
+
+                # 1: Бинаризация
+                img_anobl = (roi_mask // 255).astype(np.uint8)
+                # 2: Кол-во единиц
+                b = np.sum(img_anobl)
+                # 3: Относительная плотность
+                p = b / img_anobl.size
+
+                if p < self.p_dop:
+                    # print(f"ROI {roi}: p={p:.3f} < p_dop={self.p_dop:.3f} — нет недопустимых движений")
+                    print('')
+                    detections.append({'roi': roi, 'detected': False, 'activity': p})
+                    continue
+
+                # 5: Поиск остова
+                found = self._scan_for_template(img_anobl, self.ostov_template)
+                if found:
+                    print(f"ROI {roi}: движение недопустимо (p={p:.3f} > p_dop={self.p_dop:.3f}) — найден остов")
+                else:
+                    print(f"ROI {roi}: p={p:.3f} > p_dop={self.p_dop:.3f}, но остов не найден")
+
+                detections.append({'roi': roi, 'detected': found, 'activity': p})
+
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            bin_frame = cv2.cvtColor(diff_thresh, cv2.COLOR_GRAY2RGB)
+            self.frame_processed.emit(rgb_frame, bin_frame)
             self.detection_signal.emit(detections)
+
+            time.sleep(self.time_sleep)
 
         self.stop_detection()
 
-    def _check_movement(self, x, y, w, h):
-        """Проверка движения в конкретной области интереса"""
-        if self.current_object_mask is None:
-            return False, 0.0
+    def _scan_for_template(self, area_matrix, template):
+        """Проверка, есть ли в area_matrix блок, совпадающий с template"""
+        h, w = template.shape
+        H, W = area_matrix.shape
 
-        mask_height, mask_width = self.current_object_mask.shape[:2]
-        x1 = max(int(x), 0)
-        y1 = max(int(y), 0)
-        x2 = min(int(x + w), mask_width)
-        y2 = min(int(y + h), mask_height)
-
-        if x1 >= x2 or y1 >= y2:
-            return False, 0.0
-
-        roi = self.current_object_mask[y1:y2, x1:x2]
-        if roi.size == 0:
-            return False, 0.0
-
-        active_pixels = cv2.countNonZero(roi)
-        activity_ratio = active_pixels / roi.size
-        return activity_ratio > self.detection_threshold, activity_ratio
+        for y in range(H - h + 1):
+            for x in range(W - w + 1):
+                block = area_matrix[y:y + h, x:x + w]
+                if np.array_equal(block, template):
+                    return True
+        return False

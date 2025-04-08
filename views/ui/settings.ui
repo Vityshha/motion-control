@@ -7,83 +7,13 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>326</height>
+    <height>236</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
-    <widget class="QFrame" name="frame">
-     <property name="frameShape">
-      <enum>QFrame::StyledPanel</enum>
-     </property>
-     <property name="frameShadow">
-      <enum>QFrame::Raised</enum>
-     </property>
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <item>
-       <widget class="QLabel" name="label_6">
-        <property name="text">
-         <string>The forgetting coefficient for the accumulated difference:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QDoubleSpinBox" name="alpha">
-        <property name="minimum">
-         <double>0.100000000000000</double>
-        </property>
-        <property name="maximum">
-         <double>1.000000000000000</double>
-        </property>
-        <property name="singleStep">
-         <double>0.100000000000000</double>
-        </property>
-        <property name="value">
-         <double>0.950000000000000</double>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QFrame" name="frame_2">
-     <property name="frameShape">
-      <enum>QFrame::StyledPanel</enum>
-     </property>
-     <property name="frameShadow">
-      <enum>QFrame::Raised</enum>
-     </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_2">
-      <item>
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>The forgetting coefficient for the activity card:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QDoubleSpinBox" name="activity_alpha">
-        <property name="minimum">
-         <double>0.100000000000000</double>
-        </property>
-        <property name="maximum">
-         <double>1.000000000000000</double>
-        </property>
-        <property name="singleStep">
-         <double>0.100000000000000</double>
-        </property>
-        <property name="value">
-         <double>0.900000000000000</double>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
    <item>
     <widget class="QFrame" name="frame_4">
      <property name="frameShape">
@@ -96,12 +26,12 @@
       <item>
        <widget class="QLabel" name="label_4">
         <property name="text">
-         <string>Activity threshold:</string>
+         <string>Порог чувствительности (p_dop):</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QDoubleSpinBox" name="activity_threshold">
+       <widget class="QDoubleSpinBox" name="p_dop">
         <property name="minimum">
          <double>0.100000000000000</double>
         </property>
@@ -131,12 +61,12 @@
       <item>
        <widget class="QLabel" name="label_7">
         <property name="text">
-         <string>Filling threshold %:</string>
+         <string>Размер остова (ostov_size):</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QSpinBox" name="detection_threshold">
+       <widget class="QSpinBox" name="ostov_size">
         <property name="minimum">
          <number>1</number>
         </property>
@@ -149,28 +79,34 @@
     </widget>
    </item>
    <item>
-    <widget class="QFrame" name="frame_5">
+    <widget class="QFrame" name="frame_8">
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
      </property>
      <property name="frameShadow">
       <enum>QFrame::Raised</enum>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_4">
+     <layout class="QHBoxLayout" name="horizontalLayout_9">
       <item>
-       <widget class="QLabel" name="label_3">
+       <widget class="QLabel" name="label_9">
         <property name="text">
-         <string>The minimum area of the object:</string>
+         <string>Задержка, с:</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QSpinBox" name="min_object_area">
+       <widget class="QDoubleSpinBox" name="time_sleep">
+        <property name="minimum">
+         <double>0.000000000000000</double>
+        </property>
         <property name="maximum">
-         <number>5000</number>
+         <double>10.000000000000000</double>
+        </property>
+        <property name="singleStep">
+         <double>0.100000000000000</double>
         </property>
         <property name="value">
-         <number>200</number>
+         <double>0.200000000000000</double>
         </property>
        </widget>
       </item>
