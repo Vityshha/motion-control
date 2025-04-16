@@ -115,11 +115,12 @@ class MotionDetectorWorker(QObject):
             for idx, roi in enumerate(self.roi_list):
                 if len(roi) != 4:
                     continue
-
+                time_start = time.time()
                 x, y, w, h = map(int, roi)
                 roi_mask = diff_thresh[y:y + h, x:x + w]
                 if roi_mask.size == 0:
-                    detections.append({'roi': roi, 'detected': False, 'activity': 0.0})
+                    time_end = time.time()
+                    detections.append({'roi': roi, 'detected': False, 'activity': 0.0, 'time': time_end - time_start})
                     continue
 
                 # 2: Бинаризация
@@ -131,14 +132,16 @@ class MotionDetectorWorker(QObject):
 
                 if p < self.p_dop:
                     # Если уровень активности меньше порога, то допустимое движение
-                    detections.append({'roi': roi, 'detected': False, 'activity': p})
+                    time_end = time.time()
+                    detections.append({'roi': roi, 'detected': False, 'activity': p, 'time': time_end - time_start})
                     continue
 
                 # 5: Поиск остова
                 found = self._scan_for_template(img_anobl, self.ostov_template)
                 # if found: движение недопустимо
                 # else: движение допустимо
-                detections.append({'roi': roi, 'detected': found, 'activity': p})
+                time_end = time.time()
+                detections.append({'roi': roi, 'detected': found, 'activity': p, 'time': time_end - time_start})
 
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             bin_frame = cv2.cvtColor(diff_thresh, cv2.COLOR_GRAY2RGB)

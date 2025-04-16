@@ -1,9 +1,10 @@
 from models.settings_manager import settings_manager
 from utils.detect import MotionDetector
+from views.main_window import MainWindow
 
 
 class MainController:
-    def __init__(self, main_window):
+    def __init__(self, main_window: MainWindow):
         self.views = main_window
         self.detector = MotionDetector()
         self.connect_signals()
@@ -24,8 +25,4 @@ class MainController:
             self.views.clear_holst()
 
     def _handle_settings_change(self, new_settings):
-        # if {"is_webcam", "rtsp_or_path"} & new_settings.keys():
-        #     # if self.detector.worker.running:
-        #     #     self.detector.restart()
-        #     pass
         self.detector.worker.apply_current_settings()

@@ -101,15 +101,21 @@ class MainWindow(QMainWindow):
         # Подготовка данных
         status_text = self._generate_status_text(detection)
         roi_rect = self._get_scaled_roi_rect(detection)
+        time_text = self._get_time(detection)
 
         # Отрисовка элементов
         self._draw_bounding_box(painter, roi_rect)
         self._draw_status_text(painter, status_text, roi_rect)
+        self._draw_time_text(painter, time_text, roi_rect)
 
     def _generate_status_text(self, detection):
         """Генерация текста статуса"""
         status = 'Не допустимое' if detection['detected'] else 'Допустимое'
-        return f"{status}: p={detection['activity']:.1%}"
+        return f"{status}: p={detection['activity']:.2}"
+
+    def _get_time(self, detection):
+        """Получение времени для каждого участка"""
+        return f"t={np.round(detection['time'], 4)}"
 
     def _get_scaled_roi_rect(self, detection):
         """Получение координат ROI с учетом масштабирования"""
@@ -144,6 +150,44 @@ class MainWindow(QMainWindow):
             # Отрисовка фона и текста
             self._draw_text_background(painter, bg_rect)
             self._draw_text(painter, text, text_pos)
+
+        finally:
+            painter.restore()
+
+    def _draw_time_text(self, painter, text, roi_rect):
+        """Отрисовка времени работы"""
+        painter.save()
+        try:
+            # Настройка шрифта (можно использовать меньший размер)
+            font = QFont()
+            font.setPointSize(8)
+            painter.setFont(font)
+            metrics = QFontMetrics(font)
+
+            # Позиция текста (нижний левый угол с отступом)
+            padding = 5
+            text_width = metrics.horizontalAdvance(text)
+            text_height = metrics.height()
+
+            text_x = roi_rect.x() + padding
+            text_y = roi_rect.y() + roi_rect.height() - padding
+
+            # Прямоугольник фона
+            margin = 2
+            bg_rect = QRect(
+                text_x - margin,
+                text_y - text_height - margin,
+                text_width + 2 * margin,
+                text_height + 2 * margin
+            )
+
+            # Отрисовка фона и текста
+            painter.setBrush(Qt.white)
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(bg_rect, 3, 3)
+
+            painter.setPen(Qt.black)
+            painter.drawText(text_x, text_y, text)
 
         finally:
             painter.restore()

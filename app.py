@@ -13,6 +13,7 @@ class Application:
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     application = Application()
+    application.view.setWindowTitle('MotionControl')
     application.view.show()
     sys.exit(app.exec_())
 
