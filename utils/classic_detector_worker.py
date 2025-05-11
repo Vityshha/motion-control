@@ -96,16 +96,25 @@ class MotionDetectorWorker(QObject):
         video_writer = None
         video_path = None
 
+        last_process_time = time.time()
+
         while self.running and self.cap.isOpened():
             ret, frame = self.cap.read()
             if not ret:
                 break
 
+            now = time.time()
             frame_buffer.append(frame.copy())
 
             if self.is_bot:
                 height, width = frame.shape[:2]
                 self.roi_list = [(0, 0, width, height)]
+
+            if now - last_process_time < self.time_sleep:
+                if recording and video_writer:
+                    video_writer.write(frame)
+                continue
+            last_process_time = now
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if self.use_filter:
@@ -173,7 +182,6 @@ class MotionDetectorWorker(QObject):
                     print(f"[MotionDetectorWorker] Завершена запись: {video_path}")
 
             self.detection_signal.emit(detections)
-            time.sleep(self.time_sleep)
 
         self.cap.release()
         if video_writer:

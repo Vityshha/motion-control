@@ -45,10 +45,7 @@ settings_keyboard = ReplyKeyboardMarkup(
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
-    await message.answer(
-        f"Привет, {html.bold(message.from_user.full_name)}!\nВыбери действие:",
-        reply_markup=main_keyboard
-    )
+    await message.answer("Выберите действие:", reply_markup=main_keyboard)
 
 
 @dp.message(F.text == "🚀 Старт")
@@ -104,7 +101,7 @@ async def handle_classic_choice(message: Message):
 
 @dp.message(F.text == "🔙 Назад")
 async def handle_back(message: Message):
-    await message.answer("Возврат в главное меню:", reply_markup=main_keyboard)
+    await message.answer("", reply_markup=main_keyboard)
 
 
 @dp.message(F.text == "🧹 Очистить журнал")
@@ -176,6 +173,9 @@ async def send_video_by_index(msg: Message):
 
 async def main() -> None:
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    await bot.set_my_description(
+        "Я — бот для детектирования движения. Запускай анализ, получай уведомления и видео событий."
+    )
     await dp.start_polling(bot)
 
 
