@@ -1,8 +1,8 @@
 {
     "ostov_size": 1,
-    "p_dop": 0.8,
+    "p_dop": 0.10000000000000003,
     "time_sleep": 0.2,
-    "use_filter": true,
+    "use_filter": false,
     "is_webcam": true,
     "rtsp_or_path": ""
 }
