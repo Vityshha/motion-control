@@ -28,7 +28,7 @@ class MotionDetectorWorker(QObject):
         self.video_dir = "videos"
         os.makedirs(self.video_dir, exist_ok=True)
 
-        self.last_motion_time = 0  # для cooldown
+        self.last_motion_time = 0
 
         self._connect_settings()
         self.apply_current_settings()

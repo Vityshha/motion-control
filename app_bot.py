@@ -101,7 +101,7 @@ async def handle_classic_choice(message: Message):
 
 @dp.message(F.text == "🔙 Назад")
 async def handle_back(message: Message):
-    await message.answer("", reply_markup=main_keyboard)
+    await message.answer("Назад", reply_markup=main_keyboard)
 
 
 @dp.message(F.text == "🧹 Очистить журнал")
